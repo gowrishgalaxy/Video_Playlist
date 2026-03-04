@@ -1,0 +1,930 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>YouTube Playlist Builder</title>
+  <style>
+    :root {
+      --bg: #efefef;
+      --bg-glow: rgba(125, 135, 255, 0.09);
+      --panel: #dedee2;
+      --panel-strong: #d4d4db;
+      --text: #181818;
+      --muted: #6d6d6d;
+      --line: #2f2f2f;
+      --accent: #4d57e9;
+      --accent-soft: #6e88ea;
+      --magenta: #ff00d5;
+      --shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
+      --input: #d9d9df;
+      --placeholder: #757575;
+    }
+
+    [data-theme="dark"] {
+      --bg: #0b1220;
+      --bg-glow: rgba(54, 104, 181, 0.28);
+      --panel: #1f232a;
+      --panel-strong: #1b1f25;
+      --text: #f0f2f7;
+      --muted: #b3bac6;
+      --line: #535b67;
+      --accent: #5d6dff;
+      --accent-soft: #6882ee;
+      --magenta: #5d6dff;
+      --shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+      --input: #2a3039;
+      --placeholder: #adb4c0;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      background: radial-gradient(circle at top, var(--bg-glow), transparent 34%),
+                  var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      transition: background-color 0.2s ease, color 0.2s ease;
+    }
+
+    .page {
+      width: min(1280px, 96%);
+      margin: 0 auto;
+      padding: 16px 0 130px;
+    }
+
+    .top-bar {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: 16px;
+    }
+
+    h1 {
+      margin: 4px 0 12px 4px;
+      font-size: clamp(2rem, 4vw, 2.8rem);
+      font-weight: 400;
+      letter-spacing: 0.2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .line {
+      border: 0;
+      border-top: 1px solid var(--line);
+      margin: 6px 4px 24px;
+    }
+
+    .btn {
+      border: 0;
+      border-radius: 7px;
+      background: var(--accent);
+      color: #fff;
+      padding: 5px 12px;
+      font-size: 14px;
+      cursor: pointer;
+      box-shadow: var(--shadow);
+      line-height: 1.2;
+      transition: transform 0.15s ease, opacity 0.15s ease;
+    }
+
+    .btn:hover {
+      transform: translateY(-1px);
+    }
+
+    .btn:active {
+      transform: translateY(0);
+    }
+
+    .btn.ghost {
+      background: transparent;
+      border: 1px solid var(--line);
+      color: var(--text);
+      box-shadow: none;
+    }
+
+    .create-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+      border-radius: 10px;
+      padding: 14px;
+      margin-bottom: 18px;
+    }
+
+    .text-input {
+      flex: 1;
+      min-width: 180px;
+      border: none;
+      border-radius: 7px;
+      background: var(--input);
+      color: var(--text);
+      font-size: 36px;
+      line-height: 1;
+      padding: 10px 12px;
+      height: 52px;
+      outline: none;
+    }
+
+    .text-input::placeholder {
+      color: var(--placeholder);
+      opacity: 1;
+      font-size: 34px;
+    }
+
+    .section-list {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .section-card {
+      display: grid;
+      grid-template-columns: 130px 1fr;
+      background: var(--panel);
+      border-radius: 12px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      height: 300px;
+      position: relative;
+    }
+
+    .left-rail {
+      background: var(--panel-strong);
+      padding: 14px 12px 12px 18px;
+      position: relative;
+      border-right: 1px solid rgba(0, 0, 0, 0.05);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .left-rail::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 8px;
+      border-radius: 8px;
+      background: var(--magenta);
+    }
+
+    .section-name {
+      font-size: clamp(20px, 1.8vw, 30px);
+      line-height: 1.05;
+      border: none;
+      background: transparent;
+      color: var(--text);
+      width: 100%;
+      padding: 0;
+      outline: none;
+    }
+
+    .section-name::placeholder {
+      color: var(--text);
+      opacity: 0.7;
+    }
+
+    .section-id {
+      width: 62px;
+      font-size: 16px;
+      background: #f2f2f2;
+    }
+
+    [data-theme="dark"] .section-id {
+      background: #313742;
+      color: #f0f2f7;
+      border-color: #71798a;
+    }
+
+    .main-content {
+      display: flex;
+      flex-direction: column;
+      padding: 8px 8px 10px;
+      gap: 8px;
+      overflow-y: auto;
+    }
+
+    .add-link-row {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+
+    .video-grid {
+      display: flex;
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      overflow-y: hidden;
+      gap: 8px;
+      min-height: 150px;
+      padding-bottom: 4px;
+    }
+
+    .video-slot {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      min-width: clamp(280px, 28vw, 360px);
+      flex: 0 0 clamp(280px, 28vw, 360px);
+    }
+
+    .thumb-wrap {
+      background: #c6c6c8;
+      aspect-ratio: 16 / 9;
+      border-radius: 2px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    .thumb-wrap iframe {
+      width: 100%;
+      height: 100%;
+      border: 0;
+      display: block;
+    }
+
+    .video-meta {
+      display: grid;
+      grid-template-columns: 62px 1fr auto;
+      align-items: center;
+      gap: 10px;
+      min-height: 30px;
+      width: 100%;
+    }
+
+    .video-delete {
+      padding: 4px 10px;
+      white-space: nowrap;
+      justify-self: end;
+    }
+
+    .video-index {
+      width: 62px;
+      font-size: 16px;
+      background: #f2f2f2;
+    }
+
+    [data-theme="dark"] .video-index {
+      background: #313742;
+      color: #f0f2f7;
+      border-color: #71798a;
+    }
+
+    .video-name {
+      min-width: 0;
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      font-size: clamp(16px, 1.3vw, 22px);
+      padding: 0;
+      outline: none;
+      width: 100%;
+    }
+
+    .video-name::placeholder {
+      color: var(--muted);
+      opacity: 0.95;
+    }
+
+    .recycle-bin {
+      position: fixed;
+      left: 50%;
+      transform: translateX(-50%);
+      bottom: 12px;
+      width: min(1280px, 96%);
+      z-index: 90;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: var(--shadow);
+      background: var(--accent-soft);
+      color: #fff;
+    }
+
+    .bin-head {
+      border: 0;
+      width: 100%;
+      background: transparent;
+      color: inherit;
+      font-size: clamp(24px, 2.2vw, 34px);
+      text-align: left;
+      padding: 14px 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+    }
+
+    .arrow {
+      width: 28px;
+      height: 28px;
+      border-right: 3px solid currentColor;
+      border-bottom: 3px solid currentColor;
+      transform: rotate(45deg);
+      transition: transform 0.2s ease;
+    }
+
+    .recycle-bin.open .arrow {
+      transform: rotate(-135deg);
+    }
+
+    .bin-body {
+      display: none;
+      background: rgba(0, 0, 0, 0.08);
+      padding: 10px;
+    }
+
+    .recycle-bin.open .bin-body {
+      display: block;
+    }
+
+    .deleted-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 8px;
+      padding: 8px 12px;
+      margin-bottom: 8px;
+      font-size: 16px;
+      color: #fff;
+    }
+
+    .deleted-item:last-child {
+      margin-bottom: 0;
+    }
+
+    .empty-msg {
+      color: #f4f4f4;
+      opacity: 0.85;
+      padding: 6px 4px;
+    }
+
+    .dialog-overlay {
+      position: fixed;
+      inset: 0;
+      display: none;
+      place-items: center;
+      background: rgba(0, 0, 0, 0.58);
+      z-index: 100;
+      padding: 14px;
+    }
+
+    .dialog-overlay.show {
+      display: grid;
+    }
+
+    .dialog {
+      width: min(620px, 100%);
+      background: var(--panel);
+      color: var(--text);
+      border-radius: 12px;
+      box-shadow: var(--shadow);
+      padding: 18px;
+    }
+
+    .dialog h2 {
+      margin: 0 0 10px;
+      font-weight: 500;
+    }
+
+    .dialog-row {
+      display: grid;
+      grid-template-columns: 80px 1fr;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .dialog-row input {
+      width: 100%;
+      border: 1px solid #9aa0aa;
+      border-radius: 8px;
+      font-size: 16px;
+      padding: 10px;
+      background: var(--input);
+      color: var(--text);
+      outline: none;
+    }
+
+    .dialog-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    @media (max-width: 1000px) {
+      .section-card {
+        grid-template-columns: 110px 1fr;
+        height: 280px;
+      }
+
+      .text-input {
+        font-size: 24px;
+      }
+
+      .text-input::placeholder {
+        font-size: 23px;
+      }
+    }
+
+    @media (max-width: 700px) {
+      .top-bar {
+        grid-template-columns: 1fr auto;
+      }
+
+      h1 {
+        font-size: 32px;
+      }
+
+      .create-row {
+        flex-wrap: wrap;
+      }
+
+      .section-card {
+        grid-template-columns: 1fr;
+        height: auto;
+      }
+
+      .left-rail {
+        min-height: 120px;
+        border-right: none;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+      }
+
+      .video-slot {
+        min-width: 100%;
+        flex-basis: 100%;
+      }
+
+      .page {
+        padding-bottom: 150px;
+      }
+    }
+  </style>
+</head>
+<body data-theme="dark">
+  <main class="page" id="app" data-theme="dark">
+    <div class="top-bar">
+      <h1>YouTube Playlist</h1>
+      <button class="btn ghost" id="themeToggle" type="button">Light mode</button>
+    </div>
+    <hr class="line" />
+
+    <section class="create-row">
+      <input id="newTopicInput" class="text-input" type="text" placeholder="Enter new topic" />
+      <button id="addSectionBtn" class="btn" type="button">Add Playlist Name</button>
+    </section>
+
+    <section id="sectionList" class="section-list"></section>
+
+    <section id="recycleBin" class="recycle-bin">
+      <button id="binToggle" class="bin-head" type="button">
+        <span>Recycle Bin</span>
+        <span class="arrow" aria-hidden="true"></span>
+      </button>
+      <div class="bin-body" id="binBody"></div>
+    </section>
+  </main>
+
+  <div class="dialog-overlay" id="linkDialog">
+    <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="dialogTitle">
+      <h2 id="dialogTitle">Add YouTube link</h2>
+      <div class="dialog-row">
+        <label for="videoTitleInput">Title</label>
+        <input id="videoTitleInput" type="text" placeholder="Video name" />
+      </div>
+      <div class="dialog-row">
+        <label for="videoUrlInput">URL</label>
+        <input id="videoUrlInput" type="text" placeholder="Paste YouTube URL" />
+      </div>
+      <div class="dialog-actions">
+        <button class="btn ghost" id="cancelLinkBtn" type="button">Cancel</button>
+        <button class="btn" id="saveLinkBtn" type="button">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const app = document.getElementById("app");
+    const sectionListEl = document.getElementById("sectionList");
+    const binBodyEl = document.getElementById("binBody");
+    const recycleBinEl = document.getElementById("recycleBin");
+    const themeToggleEl = document.getElementById("themeToggle");
+    const newTopicInputEl = document.getElementById("newTopicInput");
+    const addSectionBtnEl = document.getElementById("addSectionBtn");
+    const linkDialogEl = document.getElementById("linkDialog");
+    const videoTitleInputEl = document.getElementById("videoTitleInput");
+    const videoUrlInputEl = document.getElementById("videoUrlInput");
+    const saveLinkBtnEl = document.getElementById("saveLinkBtn");
+    const cancelLinkBtnEl = document.getElementById("cancelLinkBtn");
+
+    const state = {
+      theme: "dark",
+      sections: [],
+      deletedSections: [],
+      deletedVideos: [],
+      dialogTargetSectionId: null
+    };
+
+    function id() {
+      return crypto.randomUUID();
+    }
+
+    function extractYouTubeVideoId(url) {
+      if (!url) return null;
+      const text = url.trim();
+      if (/^[a-zA-Z0-9_-]{11}$/.test(text)) return text;
+      try {
+        const parsed = new URL(text);
+        const host = parsed.hostname.replace(/^www\./, "");
+        if (host === "youtu.be") {
+          return parsed.pathname.slice(1) || null;
+        }
+        if (host === "youtube.com" || host === "m.youtube.com") {
+          if (parsed.pathname === "/watch") {
+            return parsed.searchParams.get("v");
+          }
+          if (parsed.pathname.startsWith("/embed/")) {
+            return parsed.pathname.split("/embed/")[1];
+          }
+          if (parsed.pathname.startsWith("/shorts/")) {
+            return parsed.pathname.split("/shorts/")[1];
+          }
+        }
+      } catch (err) {
+        return null;
+      }
+      return null;
+    }
+
+    function createSection(name) {
+      return {
+        id: id(),
+        title: name || "Playlist Name",
+        orderNumber: state.sections.length + 1,
+        createdAt: Date.now(),
+        videos: []
+      };
+    }
+
+    function normalizeSectionOrder() {
+      state.sections.forEach((section, idx) => {
+        section.orderNumber = idx + 1;
+      });
+    }
+
+    function moveSectionToPriority(sectionId, targetPriority) {
+      const currentIndex = state.sections.findIndex((s) => s.id === sectionId);
+      if (currentIndex === -1) return;
+
+      const [moved] = state.sections.splice(currentIndex, 1);
+      const clampedIndex = Math.max(0, Math.min(targetPriority - 1, state.sections.length));
+      state.sections.splice(clampedIndex, 0, moved);
+      normalizeSectionOrder();
+    }
+
+    function normalizeVideoOrder(section) {
+      section.videos.forEach((video, idx) => {
+        video.index = idx + 1;
+      });
+    }
+
+    function moveVideoToPriority(section, videoId, targetPriority) {
+      const currentIndex = section.videos.findIndex((v) => v.id === videoId);
+      if (currentIndex === -1) return;
+
+      const [moved] = section.videos.splice(currentIndex, 1);
+      const clampedIndex = Math.max(0, Math.min(targetPriority - 1, section.videos.length));
+      section.videos.splice(clampedIndex, 0, moved);
+      normalizeVideoOrder(section);
+    }
+
+    function openDialog(sectionId) {
+      state.dialogTargetSectionId = sectionId;
+      videoTitleInputEl.value = "";
+      videoUrlInputEl.value = "";
+      linkDialogEl.classList.add("show");
+      videoTitleInputEl.focus();
+    }
+
+    function closeDialog() {
+      state.dialogTargetSectionId = null;
+      linkDialogEl.classList.remove("show");
+    }
+
+    function renderSections() {
+      sectionListEl.innerHTML = "";
+      state.sections.forEach((section) => {
+        const card = document.createElement("article");
+        card.className = "section-card";
+        card.dataset.sectionId = section.id;
+
+        const left = document.createElement("div");
+        left.className = "left-rail";
+
+        const nameInput = document.createElement("input");
+        nameInput.className = "section-name";
+        nameInput.type = "text";
+        nameInput.value = section.title;
+        nameInput.placeholder = "Playlist Name";
+        nameInput.addEventListener("input", (e) => {
+          section.title = e.target.value;
+        });
+        nameInput.addEventListener("blur", (e) => {
+          section.title = e.target.value.trim() || "Playlist Name";
+          nameInput.value = section.title;
+        });
+
+        const select = document.createElement("select");
+        select.className = "section-id";
+        const maxPriority = Math.max(1, state.sections.length);
+        for (let i = 1; i <= maxPriority; i += 1) {
+          const opt = document.createElement("option");
+          opt.value = String(i);
+          opt.textContent = String(i);
+          if (i === section.orderNumber) opt.selected = true;
+          select.appendChild(opt);
+        }
+        select.addEventListener("change", (e) => {
+          moveSectionToPriority(section.id, Number(e.target.value));
+          renderSections();
+        });
+
+        left.appendChild(nameInput);
+        left.appendChild(select);
+
+        const main = document.createElement("div");
+        main.className = "main-content";
+
+        const topBtns = document.createElement("div");
+        topBtns.className = "add-link-row";
+
+        const addLinkBtn = document.createElement("button");
+        addLinkBtn.className = "btn";
+        addLinkBtn.type = "button";
+        addLinkBtn.textContent = "Add link";
+        addLinkBtn.addEventListener("click", () => openDialog(section.id));
+
+        const deleteBtn = document.createElement("button");
+        deleteBtn.className = "btn ghost";
+        deleteBtn.type = "button";
+        deleteBtn.textContent = "Delete";
+        deleteBtn.addEventListener("click", () => deleteSection(section.id));
+
+        topBtns.appendChild(addLinkBtn);
+        topBtns.appendChild(deleteBtn);
+
+        const grid = document.createElement("div");
+        grid.className = "video-grid";
+
+        section.videos.forEach((video) => {
+          const slot = document.createElement("div");
+          slot.className = "video-slot";
+
+          const thumb = document.createElement("div");
+          thumb.className = "thumb-wrap";
+
+          if (video.youtubeId) {
+            const iframe = document.createElement("iframe");
+            iframe.src = "https://www.youtube.com/embed/" + video.youtubeId + "?controls=1&fs=1&rel=0&playsinline=1&modestbranding=1&iv_load_policy=3";
+            iframe.title = video.name || "YouTube video player";
+            iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share";
+            iframe.allowFullscreen = true;
+            iframe.loading = "lazy";
+            iframe.referrerPolicy = "strict-origin-when-cross-origin";
+            thumb.appendChild(iframe);
+          }
+
+          const meta = document.createElement("div");
+          meta.className = "video-meta";
+
+          const idx = document.createElement("select");
+          idx.className = "video-index";
+          const maxVideoPriority = Math.max(1, section.videos.length);
+          for (let i = 1; i <= maxVideoPriority; i += 1) {
+            const opt = document.createElement("option");
+            opt.value = String(i);
+            opt.textContent = String(i);
+            if (i === video.index) opt.selected = true;
+            idx.appendChild(opt);
+          }
+          idx.addEventListener("change", (e) => {
+            moveVideoToPriority(section, video.id, Number(e.target.value));
+            renderSections();
+          });
+
+          const name = document.createElement("input");
+          name.className = "video-name";
+          name.type = "text";
+          name.value = video.name;
+          name.placeholder = "Video name";
+          name.addEventListener("input", (e) => {
+            video.name = e.target.value;
+          });
+          name.addEventListener("blur", (e) => {
+            video.name = e.target.value.trim() || "Video name";
+            name.value = video.name;
+          });
+
+          const deleteVideoBtn = document.createElement("button");
+          deleteVideoBtn.className = "btn ghost video-delete";
+          deleteVideoBtn.type = "button";
+          deleteVideoBtn.textContent = "Delete";
+          deleteVideoBtn.addEventListener("click", () => deleteVideo(section.id, video.id));
+
+          meta.appendChild(idx);
+          meta.appendChild(name);
+          meta.appendChild(deleteVideoBtn);
+          slot.appendChild(thumb);
+          slot.appendChild(meta);
+          grid.appendChild(slot);
+        });
+
+        main.appendChild(topBtns);
+        main.appendChild(grid);
+
+        card.appendChild(left);
+        card.appendChild(main);
+        sectionListEl.appendChild(card);
+      });
+    }
+
+    function renderDeleted() {
+      if (state.deletedSections.length === 0 && state.deletedVideos.length === 0) {
+        binBodyEl.innerHTML = '<div class="empty-msg">No deleted sections or videos</div>';
+        return;
+      }
+
+      binBodyEl.innerHTML = "";
+      state.deletedSections.forEach((section) => {
+        const row = document.createElement("div");
+        row.className = "deleted-item";
+
+        const label = document.createElement("span");
+        label.textContent = section.title + " (no. " + section.orderNumber + ")";
+
+        const actions = document.createElement("div");
+        const restore = document.createElement("button");
+        restore.className = "btn";
+        restore.type = "button";
+        restore.textContent = "Restore";
+        restore.addEventListener("click", () => restoreSection(section.id));
+
+        actions.appendChild(restore);
+        row.appendChild(label);
+        row.appendChild(actions);
+        binBodyEl.appendChild(row);
+      });
+
+      state.deletedVideos.forEach((deletedVideo) => {
+        const row = document.createElement("div");
+        row.className = "deleted-item";
+
+        const label = document.createElement("span");
+        label.textContent = "Video: " + (deletedVideo.video.name || "Video name") + " (from " + deletedVideo.sectionTitle + ")";
+
+        const actions = document.createElement("div");
+        const restore = document.createElement("button");
+        restore.className = "btn";
+        restore.type = "button";
+        restore.textContent = "Restore";
+        restore.addEventListener("click", () => restoreVideo(deletedVideo.id));
+
+        actions.appendChild(restore);
+        row.appendChild(label);
+        row.appendChild(actions);
+        binBodyEl.appendChild(row);
+      });
+    }
+
+    function addSection() {
+      const title = newTopicInputEl.value.trim();
+      state.sections.push(createSection(title));
+      normalizeSectionOrder();
+      newTopicInputEl.value = "";
+      renderSections();
+    }
+
+    function deleteSection(sectionId) {
+      const idx = state.sections.findIndex((s) => s.id === sectionId);
+      if (idx === -1) return;
+      const [section] = state.sections.splice(idx, 1);
+      state.deletedSections.unshift(section);
+      normalizeSectionOrder();
+      renderSections();
+      renderDeleted();
+    }
+
+    function restoreSection(sectionId) {
+      const idx = state.deletedSections.findIndex((s) => s.id === sectionId);
+      if (idx === -1) return;
+      const [section] = state.deletedSections.splice(idx, 1);
+      state.sections.push(section);
+      normalizeSectionOrder();
+      renderSections();
+      renderDeleted();
+    }
+
+    function deleteVideo(sectionId, videoId) {
+      const section = state.sections.find((s) => s.id === sectionId);
+      if (!section) return;
+      const idx = section.videos.findIndex((v) => v.id === videoId);
+      if (idx === -1) return;
+
+      const [video] = section.videos.splice(idx, 1);
+      state.deletedVideos.unshift({
+        id: id(),
+        sectionId,
+        sectionTitle: section.title || "Playlist Name",
+        video
+      });
+      normalizeVideoOrder(section);
+
+      renderSections();
+      renderDeleted();
+    }
+
+    function restoreVideo(deletedVideoId) {
+      const idx = state.deletedVideos.findIndex((v) => v.id === deletedVideoId);
+      if (idx === -1) return;
+      const [deletedVideo] = state.deletedVideos.splice(idx, 1);
+
+      const section = state.sections.find((s) => s.id === deletedVideo.sectionId);
+      if (!section) {
+        state.deletedVideos.unshift(deletedVideo);
+        alert("Original section not available. Restore the section first.");
+        renderDeleted();
+        return;
+      }
+
+      section.videos.push(deletedVideo.video);
+      normalizeVideoOrder(section);
+      renderSections();
+      renderDeleted();
+    }
+
+    function saveLink() {
+      const section = state.sections.find((s) => s.id === state.dialogTargetSectionId);
+      if (!section) return;
+
+      const title = videoTitleInputEl.value.trim();
+      const url = videoUrlInputEl.value.trim();
+      const youtubeId = extractYouTubeVideoId(url);
+
+      if (!youtubeId) {
+        alert("Please paste a valid YouTube link.");
+        return;
+      }
+
+      section.videos.push({
+        id: id(),
+        index: 0,
+        name: title || "Video name",
+        youtubeId,
+        createdAt: Date.now()
+      });
+      normalizeVideoOrder(section);
+      renderSections();
+      closeDialog();
+    }
+
+    function toggleTheme() {
+      state.theme = state.theme === "light" ? "dark" : "light";
+      app.dataset.theme = state.theme;
+      document.body.dataset.theme = state.theme;
+      themeToggleEl.textContent = state.theme === "light" ? "Dark mode" : "Light mode";
+    }
+
+    document.getElementById("binToggle").addEventListener("click", () => {
+      recycleBinEl.classList.toggle("open");
+    });
+    addSectionBtnEl.addEventListener("click", addSection);
+    newTopicInputEl.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") addSection();
+    });
+    cancelLinkBtnEl.addEventListener("click", closeDialog);
+    saveLinkBtnEl.addEventListener("click", saveLink);
+    linkDialogEl.addEventListener("click", (e) => {
+      if (e.target === linkDialogEl) closeDialog();
+    });
+    themeToggleEl.addEventListener("click", toggleTheme);
+
+    state.sections = [];
+    renderSections();
+    renderDeleted();
+  </script>
+</body>
+</html>
