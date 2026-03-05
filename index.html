@@ -486,6 +486,9 @@
     <section class="create-row">
       <input id="newTopicInput" class="text-input" type="text" placeholder="Enter new topic" />
       <button id="addSectionBtn" class="btn" type="button">Add Playlist Name</button>
+      <button id="exportDataBtn" class="btn ghost" type="button">Export Data</button>
+      <button id="importDataBtn" class="btn ghost" type="button">Import Data</button>
+      <input id="importDataInput" type="file" accept="application/json" hidden />
     </section>
 
     <section id="sectionList" class="section-list"></section>
@@ -530,6 +533,9 @@
     const videoUrlInputEl = document.getElementById("videoUrlInput");
     const saveLinkBtnEl = document.getElementById("saveLinkBtn");
     const cancelLinkBtnEl = document.getElementById("cancelLinkBtn");
+    const exportDataBtnEl = document.getElementById("exportDataBtn");
+    const importDataBtnEl = document.getElementById("importDataBtn");
+    const importDataInputEl = document.getElementById("importDataInput");
     const STORAGE_KEY = "youtube-playlist-builder-state-v1";
 
     const state = {
@@ -564,6 +570,72 @@
       } catch (err) {
         localStorage.removeItem(STORAGE_KEY);
       }
+    }
+
+    function exportData() {
+      const data = {
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        theme: state.theme,
+        sections: state.sections,
+        deletedSections: state.deletedSections,
+        deletedVideos: state.deletedVideos
+      };
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const safeDate = new Date().toISOString().slice(0, 10);
+      a.href = url;
+      a.download = "youtube-playlist-data-" + safeDate + ".json";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    function normalizeAllVideoOrder() {
+      state.sections.forEach((section) => {
+        if (!Array.isArray(section.videos)) section.videos = [];
+        normalizeVideoOrder(section);
+      });
+    }
+
+    function applyImportedState(data) {
+      if (!data || typeof data !== "object") {
+        throw new Error("Invalid file format");
+      }
+      state.theme = data.theme === "light" ? "light" : "dark";
+      state.sections = Array.isArray(data.sections) ? data.sections : [];
+      state.deletedSections = Array.isArray(data.deletedSections) ? data.deletedSections : [];
+      state.deletedVideos = Array.isArray(data.deletedVideos) ? data.deletedVideos : [];
+      normalizeSectionOrder();
+      normalizeAllVideoOrder();
+    }
+
+    function importDataFromFile(file) {
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          const parsed = JSON.parse(String(reader.result || ""));
+          applyImportedState(parsed);
+          app.dataset.theme = state.theme;
+          document.body.dataset.theme = state.theme;
+          themeToggleEl.textContent = state.theme === "light" ? "Dark mode" : "Light mode";
+          saveState();
+          renderSections();
+          renderDeleted();
+        } catch (err) {
+          alert("Could not import data. Please use a valid export JSON file.");
+        } finally {
+          importDataInputEl.value = "";
+        }
+      };
+      reader.onerror = () => {
+        alert("Could not read the selected file.");
+        importDataInputEl.value = "";
+      };
+      reader.readAsText(file);
     }
 
     function id() {
@@ -957,6 +1029,13 @@
     });
     cancelLinkBtnEl.addEventListener("click", closeDialog);
     saveLinkBtnEl.addEventListener("click", saveLink);
+    exportDataBtnEl.addEventListener("click", exportData);
+    importDataBtnEl.addEventListener("click", () => importDataInputEl.click());
+    importDataInputEl.addEventListener("change", (e) => {
+      const target = e.target;
+      const file = target.files && target.files[0] ? target.files[0] : null;
+      importDataFromFile(file);
+    });
     linkDialogEl.addEventListener("click", (e) => {
       if (e.target === linkDialogEl) closeDialog();
     });
