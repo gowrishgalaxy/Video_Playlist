@@ -530,6 +530,7 @@
     const videoUrlInputEl = document.getElementById("videoUrlInput");
     const saveLinkBtnEl = document.getElementById("saveLinkBtn");
     const cancelLinkBtnEl = document.getElementById("cancelLinkBtn");
+    const STORAGE_KEY = "youtube-playlist-builder-state-v1";
 
     const state = {
       theme: "dark",
@@ -538,6 +539,32 @@
       deletedVideos: [],
       dialogTargetSectionId: null
     };
+
+    function saveState() {
+      const data = {
+        theme: state.theme,
+        sections: state.sections,
+        deletedSections: state.deletedSections,
+        deletedVideos: state.deletedVideos
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    }
+
+    function loadState() {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return;
+      try {
+        const data = JSON.parse(raw);
+        if (data && typeof data === "object") {
+          state.theme = data.theme === "light" ? "light" : "dark";
+          state.sections = Array.isArray(data.sections) ? data.sections : [];
+          state.deletedSections = Array.isArray(data.deletedSections) ? data.deletedSections : [];
+          state.deletedVideos = Array.isArray(data.deletedVideos) ? data.deletedVideos : [];
+        }
+      } catch (err) {
+        localStorage.removeItem(STORAGE_KEY);
+      }
+    }
 
     function id() {
       return crypto.randomUUID();
@@ -642,10 +669,12 @@
         nameInput.placeholder = "Playlist Name";
         nameInput.addEventListener("input", (e) => {
           section.title = e.target.value;
+          saveState();
         });
         nameInput.addEventListener("blur", (e) => {
           section.title = e.target.value.trim() || "Playlist Name";
           nameInput.value = section.title;
+          saveState();
         });
 
         const select = document.createElement("select");
@@ -660,6 +689,7 @@
         }
         select.addEventListener("change", (e) => {
           moveSectionToPriority(section.id, Number(e.target.value));
+          saveState();
           renderSections();
         });
 
@@ -723,6 +753,7 @@
           }
           idx.addEventListener("change", (e) => {
             moveVideoToPriority(section, video.id, Number(e.target.value));
+            saveState();
             renderSections();
           });
 
@@ -733,10 +764,12 @@
           name.placeholder = "Video name";
           name.addEventListener("input", (e) => {
             video.name = e.target.value;
+            saveState();
           });
           name.addEventListener("blur", (e) => {
             video.name = e.target.value.trim() || "Video name";
             name.value = video.name;
+            saveState();
           });
 
           const deleteVideoBtn = document.createElement("button");
@@ -815,6 +848,7 @@
       state.sections.push(createSection(title));
       normalizeSectionOrder();
       newTopicInputEl.value = "";
+      saveState();
       renderSections();
     }
 
@@ -824,6 +858,7 @@
       const [section] = state.sections.splice(idx, 1);
       state.deletedSections.unshift(section);
       normalizeSectionOrder();
+      saveState();
       renderSections();
       renderDeleted();
     }
@@ -834,6 +869,7 @@
       const [section] = state.deletedSections.splice(idx, 1);
       state.sections.push(section);
       normalizeSectionOrder();
+      saveState();
       renderSections();
       renderDeleted();
     }
@@ -852,6 +888,7 @@
         video
       });
       normalizeVideoOrder(section);
+      saveState();
 
       renderSections();
       renderDeleted();
@@ -872,6 +909,7 @@
 
       section.videos.push(deletedVideo.video);
       normalizeVideoOrder(section);
+      saveState();
       renderSections();
       renderDeleted();
     }
@@ -897,6 +935,7 @@
         createdAt: Date.now()
       });
       normalizeVideoOrder(section);
+      saveState();
       renderSections();
       closeDialog();
     }
@@ -906,6 +945,7 @@
       app.dataset.theme = state.theme;
       document.body.dataset.theme = state.theme;
       themeToggleEl.textContent = state.theme === "light" ? "Dark mode" : "Light mode";
+      saveState();
     }
 
     document.getElementById("binToggle").addEventListener("click", () => {
@@ -922,7 +962,10 @@
     });
     themeToggleEl.addEventListener("click", toggleTheme);
 
-    state.sections = [];
+    loadState();
+    app.dataset.theme = state.theme;
+    document.body.dataset.theme = state.theme;
+    themeToggleEl.textContent = state.theme === "light" ? "Dark mode" : "Light mode";
     renderSections();
     renderDeleted();
   </script>
