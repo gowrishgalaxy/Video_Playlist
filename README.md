@@ -7,10 +7,12 @@ YouTube Playlist Builder is a lightweight, client-side web application that allo
 - **Create Custom Sections:** Group your videos into distinct playlists or categories.
 - **Add Videos Easily:** Simply paste a YouTube URL to embed a video.
 - **Reordering:** Change the priority/order of sections or individual videos seamlessly.
+- **Uninterrupted Playback:** UI updates (adding, deleting, moving) happen dynamically without reloading playing videos.
 - **Data Export & Import:** Save your playlists as a JSON file to back them up or move them to another device.
 - **Recycle Bin:** Accidentally deleted a video or section? Restore it instantly from the Recycle Bin.
 - **Dark/Light Theme:** Toggle between themes for comfortable viewing.
 - **Local Storage:** Your playlist data is automatically saved to your browser's local storage, ensuring your work is there when you return.
+- **Session Auto-Reset:** If the application is closed for more than 10 minutes without a refresh, the session is automatically cleared to provide a fresh start.
 
 ## How it Works (Brainstorming Flow)
 

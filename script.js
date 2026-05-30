@@ -28,7 +28,8 @@ function saveState() {
     theme: state.theme,
     sections: state.sections,
     deletedSections: state.deletedSections,
-    deletedVideos: state.deletedVideos
+    deletedVideos: state.deletedVideos,
+    lastSaved: Date.now()
   };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
 }
@@ -39,6 +40,15 @@ function loadState() {
   try {
     const data = JSON.parse(raw);
     if (data && typeof data === "object") {
+      if (data.lastSaved && (Date.now() - data.lastSaved > 10 * 60 * 1000)) {
+        const navEntries = performance.getEntriesByType && performance.getEntriesByType("navigation");
+        const isReload = navEntries && navEntries.length > 0 && navEntries[0].type === "reload";
+        
+        if (!isReload) {
+          localStorage.removeItem(STORAGE_KEY);
+          return;
+        }
+      }
       state.theme = data.theme === "light" ? "light" : "dark";
       state.sections = Array.isArray(data.sections) ? data.sections : [];
       state.deletedSections = Array.isArray(data.deletedSections) ? data.deletedSections : [];
@@ -301,34 +311,15 @@ function updateSectionVideoDropdowns(section) {
   });
 }
 
-function renderSections() {
-  sectionListEl.innerHTML = "";
+function updateAllSectionDropdowns() {
+  const maxPriority = Math.max(1, state.sections.length);
   state.sections.forEach((section) => {
-    const card = document.createElement("article");
-    card.className = "section-card";
-    card.dataset.sectionId = section.id;
-
-    const left = document.createElement("div");
-    left.className = "left-rail";
-
-    const nameInput = document.createElement("input");
-    nameInput.className = "section-name";
-    nameInput.type = "text";
-    nameInput.value = section.title;
-    nameInput.placeholder = "Playlist Name";
-    nameInput.addEventListener("input", (e) => {
-      section.title = e.target.value;
-      saveState();
-    });
-    nameInput.addEventListener("blur", (e) => {
-      section.title = e.target.value.trim() || "Playlist Name";
-      nameInput.value = section.title;
-      saveState();
-    });
-
-    const select = document.createElement("select");
-    select.className = "section-id";
-    const maxPriority = Math.max(1, state.sections.length);
+    const card = document.querySelector(`.section-card[data-section-id="${section.id}"]`);
+    if (!card) return;
+    const select = card.querySelector(".section-id");
+    if (!select) return;
+    
+    select.innerHTML = "";
     for (let i = 1; i <= maxPriority; i += 1) {
       const opt = document.createElement("option");
       opt.value = String(i);
@@ -336,49 +327,111 @@ function renderSections() {
       if (i === section.orderNumber) opt.selected = true;
       select.appendChild(opt);
     }
-    select.addEventListener("change", (e) => {
-      moveSectionToPriority(section.id, Number(e.target.value));
-      saveState();
+  });
+}
+
+function createSectionElement(section) {
+  const card = document.createElement("article");
+  card.className = "section-card";
+  card.dataset.sectionId = section.id;
+
+  const left = document.createElement("div");
+  left.className = "left-rail";
+
+  const nameInput = document.createElement("input");
+  nameInput.className = "section-name";
+  nameInput.type = "text";
+  nameInput.value = section.title;
+  nameInput.placeholder = "Playlist Name";
+  nameInput.addEventListener("input", (e) => {
+    section.title = e.target.value;
+    saveState();
+  });
+  nameInput.addEventListener("blur", (e) => {
+    section.title = e.target.value.trim() || "Playlist Name";
+    nameInput.value = section.title;
+    saveState();
+  });
+
+  const select = document.createElement("select");
+  select.className = "section-id";
+  const maxPriority = Math.max(1, state.sections.length);
+  for (let i = 1; i <= maxPriority; i += 1) {
+    const opt = document.createElement("option");
+    opt.value = String(i);
+    opt.textContent = String(i);
+    if (i === section.orderNumber) opt.selected = true;
+    select.appendChild(opt);
+  }
+  select.addEventListener("change", (e) => {
+    moveSectionToPriority(section.id, Number(e.target.value));
+    saveState();
+    
+    const movedCard = document.querySelector(`.section-card[data-section-id="${section.id}"]`);
+    if (movedCard) {
+      const newIndex = state.sections.findIndex((s) => s.id === section.id);
+      if (newIndex === state.sections.length - 1) {
+        sectionListEl.appendChild(movedCard);
+      } else {
+        const nextSection = state.sections[newIndex + 1];
+        const nextCard = document.querySelector(`.section-card[data-section-id="${nextSection.id}"]`);
+        if (nextCard) {
+          sectionListEl.insertBefore(movedCard, nextCard);
+        } else {
+          renderSections();
+        }
+      }
+      updateAllSectionDropdowns();
+    } else {
       renderSections();
-    });
+    }
+  });
 
-    left.appendChild(nameInput);
-    left.appendChild(select);
+  left.appendChild(nameInput);
+  left.appendChild(select);
 
-    const main = document.createElement("div");
-    main.className = "main-content";
+  const main = document.createElement("div");
+  main.className = "main-content";
 
-    const topBtns = document.createElement("div");
-    topBtns.className = "add-link-row";
+  const topBtns = document.createElement("div");
+  topBtns.className = "add-link-row";
 
-    const addLinkBtn = document.createElement("button");
-    addLinkBtn.className = "btn";
-    addLinkBtn.type = "button";
-    addLinkBtn.textContent = "Add link";
-    addLinkBtn.addEventListener("click", () => openDialog(section.id));
+  const addLinkBtn = document.createElement("button");
+  addLinkBtn.className = "btn";
+  addLinkBtn.type = "button";
+  addLinkBtn.textContent = "Add link";
+  addLinkBtn.addEventListener("click", () => openDialog(section.id));
 
-    const deleteBtn = document.createElement("button");
-    deleteBtn.className = "btn ghost";
-    deleteBtn.type = "button";
-    deleteBtn.textContent = "Delete";
-    deleteBtn.addEventListener("click", () => deleteSection(section.id));
+  const deleteBtn = document.createElement("button");
+  deleteBtn.className = "btn ghost";
+  deleteBtn.type = "button";
+  deleteBtn.textContent = "Delete";
+  deleteBtn.addEventListener("click", () => deleteSection(section.id));
 
-    topBtns.appendChild(addLinkBtn);
-    topBtns.appendChild(deleteBtn);
+  topBtns.appendChild(addLinkBtn);
+  topBtns.appendChild(deleteBtn);
 
-    const grid = document.createElement("div");
-    grid.className = "video-grid";
+  const grid = document.createElement("div");
+  grid.className = "video-grid";
 
-    section.videos.forEach((video) => {
-      const slot = createVideoElement(section, video);
-      grid.appendChild(slot);
-    });
+  section.videos.forEach((video) => {
+    const slot = createVideoElement(section, video);
+    grid.appendChild(slot);
+  });
 
-    main.appendChild(topBtns);
-    main.appendChild(grid);
+  main.appendChild(topBtns);
+  main.appendChild(grid);
 
-    card.appendChild(left);
-    card.appendChild(main);
+  card.appendChild(left);
+  card.appendChild(main);
+  
+  return card;
+}
+
+function renderSections() {
+  sectionListEl.innerHTML = "";
+  state.sections.forEach((section) => {
+    const card = createSectionElement(section);
     sectionListEl.appendChild(card);
   });
 }
@@ -433,11 +486,15 @@ function renderDeleted() {
 
 function addSection() {
   const title = newTopicInputEl.value.trim();
-  state.sections.push(createSection(title));
+  const newSection = createSection(title);
+  state.sections.push(newSection);
   normalizeSectionOrder();
   newTopicInputEl.value = "";
   saveState();
-  renderSections();
+  
+  const card = createSectionElement(newSection);
+  sectionListEl.appendChild(card);
+  updateAllSectionDropdowns();
 }
 
 function deleteSection(sectionId) {
@@ -447,7 +504,14 @@ function deleteSection(sectionId) {
   state.deletedSections.unshift(section);
   normalizeSectionOrder();
   saveState();
-  renderSections();
+  
+  const card = document.querySelector(`.section-card[data-section-id="${sectionId}"]`);
+  if (card) {
+    card.remove();
+    updateAllSectionDropdowns();
+  } else {
+    renderSections();
+  }
   renderDeleted();
 }
 
@@ -458,7 +522,11 @@ function restoreSection(sectionId) {
   state.sections.push(section);
   normalizeSectionOrder();
   saveState();
-  renderSections();
+  
+  const card = createSectionElement(section);
+  sectionListEl.appendChild(card);
+  updateAllSectionDropdowns();
+  
   renderDeleted();
 }
 
@@ -581,6 +649,7 @@ linkDialogEl.addEventListener("click", (e) => {
   if (e.target === linkDialogEl) closeDialog();
 });
 themeToggleEl.addEventListener("click", toggleTheme);
+window.addEventListener("beforeunload", saveState);
 
 loadState();
 app.dataset.theme = state.theme;
