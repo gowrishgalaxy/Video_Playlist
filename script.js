@@ -194,6 +194,12 @@ function parseMediaLink(url) {
     if (host === "threads.net") {
       return { platform: "threads", url: text };
     }
+    if (host === "imdb.com" || host === "m.imdb.com") {
+      const match = parsed.pathname.match(/\/title\/(tt\d+)/);
+      if (match) {
+        return { platform: "imdb", id: match[1] };
+      }
+    }
 
     return { platform: "other", url: text };
   } catch (err) {
@@ -311,6 +317,12 @@ function createVideoElement(section, video) {
       vid.style.width = "100%";
       vid.style.height = "100%";
       thumb.appendChild(vid);
+    } else if (md.platform === "imdb") {
+      const iframe = document.createElement("iframe");
+      iframe.src = `https://vidsrc.me/embed/${md.id}`;
+      iframe.allowFullscreen = true;
+      iframe.loading = "lazy";
+      thumb.appendChild(iframe);
     } else if (md.platform === "torrent") {
       const msg = document.createElement("div");
       msg.style.padding = "20px";

@@ -1,11 +1,11 @@
 # Multi-Platform Media Playlist Builder
 
-Media Playlist Builder is a lightweight, client-side web application that allows users to create, organize, and manage custom video playlists across multiple platforms (YouTube, Instagram, Reddit, LinkedIn, Threads, direct files, and torrents) without needing any accounts.
+Media Playlist Builder is a lightweight, client-side web application that allows users to create, organize, and manage custom video playlists across multiple platforms (YouTube, Instagram, Reddit, LinkedIn, Threads, IMDb, direct files, and torrents) without needing any accounts.
 
 ## Features
 
 - **Create Custom Sections:** Group your videos into distinct playlists or categories.
-- **Multi-Platform Support:** Paste a link from YouTube, Instagram, Reddit, LinkedIn, Threads, online streaming domains, or magnet links to automatically generate the correct embed and thumbnail.
+- **Multi-Platform Support:** Paste a link from YouTube, Instagram, Reddit, LinkedIn, Threads, IMDb (for free movie streaming), online streaming domains, or magnet links to automatically generate the correct embed and thumbnail.
 - **Reordering:** Change the priority/order of sections or individual videos seamlessly.
 - **Uninterrupted Playback:** UI updates (adding, deleting, moving) happen dynamically without reloading playing videos.
 - **Data Export & Import:** Save your playlists as a JSON file to back them up or move them to another device.
