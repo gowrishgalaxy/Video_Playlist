@@ -8,6 +8,7 @@ Media Playlist Builder is a lightweight, client-side web application that allows
 - **Multi-Platform Support:** Paste a link from YouTube, Instagram, Reddit, LinkedIn, Threads, IMDb (for free movie streaming), online streaming domains, or magnet links to automatically generate the correct embed and thumbnail.
 - **Reordering:** Change the priority/order of sections or individual videos seamlessly.
 - **Uninterrupted Playback:** UI updates (adding, deleting, moving) happen dynamically without reloading playing videos.
+- **Live Auto-Backup:** Select a local backup file to automatically and seamlessly sync every change to your disk.
 - **Data Export & Import:** Save your playlists as a JSON file to back them up or move them to another device.
 - **Recycle Bin:** Accidentally deleted a video or section? Restore it instantly from the Recycle Bin.
 - **Dark/Light Theme:** Toggle between themes for comfortable viewing.

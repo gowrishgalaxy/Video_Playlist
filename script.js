@@ -23,6 +23,10 @@ const state = {
   dialogTargetSectionId: null
 };
 
+let backupFileHandle = null;
+let isWritingBackup = false;
+let backupPending = false;
+
 function saveState() {
   const data = {
     theme: state.theme,
@@ -32,6 +36,37 @@ function saveState() {
     lastSaved: Date.now()
   };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  writeBackup();
+}
+
+async function writeBackup() {
+  if (!backupFileHandle) return;
+  if (isWritingBackup) {
+    backupPending = true;
+    return;
+  }
+  isWritingBackup = true;
+  backupPending = false;
+  try {
+    const writable = await backupFileHandle.createWritable();
+    const data = {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      theme: state.theme,
+      sections: state.sections,
+      deletedSections: state.deletedSections,
+      deletedVideos: state.deletedVideos
+    };
+    await writable.write(JSON.stringify(data, null, 2));
+    await writable.close();
+  } catch (err) {
+    console.error("Failed to write to backup file:", err);
+  } finally {
+    isWritingBackup = false;
+    if (backupPending) {
+      writeBackup();
+    }
+  }
 }
 
 function loadState() {
@@ -769,6 +804,28 @@ linkDialogEl.addEventListener("click", (e) => {
 });
 themeToggleEl.addEventListener("click", toggleTheme);
 window.addEventListener("beforeunload", saveState);
+
+if ('showSaveFilePicker' in window) {
+  const backupBtnEl = document.createElement("button");
+  backupBtnEl.className = "btn";
+  backupBtnEl.textContent = "Auto-Backup";
+  backupBtnEl.title = "Select a local file to automatically save changes";
+  backupBtnEl.addEventListener("click", async () => {
+    try {
+      backupFileHandle = await window.showSaveFilePicker({
+        suggestedName: 'playlist-backup.json',
+        types: [{ description: 'JSON Files', accept: {'application/json': ['.json']} }],
+      });
+      alert("Auto-backup is now active! All your actions will automatically sync to the selected file.");
+      writeBackup();
+    } catch (err) {
+      console.error("Backup setup cancelled or failed", err);
+    }
+  });
+  if (exportDataBtnEl && exportDataBtnEl.parentNode) {
+    exportDataBtnEl.parentNode.insertBefore(backupBtnEl, exportDataBtnEl.nextSibling);
+  }
+}
 
 loadState();
 app.dataset.theme = state.theme;
