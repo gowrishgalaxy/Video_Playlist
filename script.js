@@ -82,10 +82,36 @@ function applyImportedState(data) {
   if (!data || typeof data !== "object") {
     throw new Error("Invalid file format");
   }
-  state.theme = data.theme === "light" ? "light" : "dark";
-  state.sections = Array.isArray(data.sections) ? data.sections : [];
-  state.deletedSections = Array.isArray(data.deletedSections) ? data.deletedSections : [];
-  state.deletedVideos = Array.isArray(data.deletedVideos) ? data.deletedVideos : [];
+  if (data.theme === "light" || data.theme === "dark") {
+    state.theme = data.theme;
+  }
+  if (Array.isArray(data.sections)) {
+    data.sections.forEach((importedSection) => {
+      const existingSection = state.sections.find((s) => s.id === importedSection.id);
+      if (existingSection) {
+        if (Array.isArray(importedSection.videos)) {
+          importedSection.videos.forEach((importedVideo) => {
+            const existingVideo = existingSection.videos.find((v) => v.id === importedVideo.id);
+            if (!existingVideo) existingSection.videos.push(importedVideo);
+          });
+        }
+      } else {
+        state.sections.push(importedSection);
+      }
+    });
+  }
+  if (Array.isArray(data.deletedSections)) {
+    data.deletedSections.forEach((importedSection) => {
+      const existing = state.deletedSections.find((s) => s.id === importedSection.id);
+      if (!existing) state.deletedSections.push(importedSection);
+    });
+  }
+  if (Array.isArray(data.deletedVideos)) {
+    data.deletedVideos.forEach((importedVideo) => {
+      const existing = state.deletedVideos.find((v) => v.id === importedVideo.id);
+      if (!existing) state.deletedVideos.push(importedVideo);
+    });
+  }
   normalizeSectionOrder();
   normalizeAllVideoOrder();
 }
@@ -120,31 +146,59 @@ function id() {
   return crypto.randomUUID();
 }
 
-function extractYouTubeVideoId(url) {
+function parseMediaLink(url) {
   if (!url) return null;
   const text = url.trim();
-  if (/^[a-zA-Z0-9_-]{11}$/.test(text)) return text;
+
+  if (/\.(mp4|webm|ogg|m3u8)(\?.*)?$/i.test(text)) {
+    return { platform: "direct", url: text };
+  }
+  if (text.startsWith("magnet:?")) {
+    return { platform: "torrent", url: text };
+  }
+  if (/^[a-zA-Z0-9_-]{11}$/.test(text)) {
+    return { platform: "youtube", id: text };
+  }
+
   try {
     const parsed = new URL(text);
     const host = parsed.hostname.replace(/^www\./, "");
+
     if (host === "youtu.be") {
-      return parsed.pathname.slice(1) || null;
+      return { platform: "youtube", id: parsed.pathname.slice(1) || null };
     }
     if (host === "youtube.com" || host === "m.youtube.com") {
       if (parsed.pathname === "/watch") {
-        return parsed.searchParams.get("v");
+        return { platform: "youtube", id: parsed.searchParams.get("v") };
       }
       if (parsed.pathname.startsWith("/embed/")) {
-        return parsed.pathname.split("/embed/")[1];
+        return { platform: "youtube", id: parsed.pathname.split("/embed/")[1] };
       }
       if (parsed.pathname.startsWith("/shorts/")) {
-        return parsed.pathname.split("/shorts/")[1];
+        return { platform: "youtube", id: parsed.pathname.split("/shorts/")[1] };
       }
     }
+
+    if (host === "instagram.com") {
+      const match = parsed.pathname.match(/\/(p|reel|tv)\/([^/]+)/);
+      if (match) {
+        return { platform: "instagram", id: match[2], type: match[1] };
+      }
+    }
+    if (host === "reddit.com" || host === "old.reddit.com") {
+      return { platform: "reddit", pathname: parsed.pathname };
+    }
+    if (host === "linkedin.com") {
+      return { platform: "linkedin", url: text };
+    }
+    if (host === "threads.net") {
+      return { platform: "threads", url: text };
+    }
+
+    return { platform: "other", url: text };
   } catch (err) {
     return null;
   }
-  return null;
 }
 
 function createSection(name) {
@@ -211,15 +265,68 @@ function createVideoElement(section, video) {
   const thumb = document.createElement("div");
   thumb.className = "thumb-wrap";
 
-  if (video.youtubeId) {
+  if (video.youtubeId || (video.mediaData && video.mediaData.platform === "youtube")) {
+    const yId = video.youtubeId || video.mediaData.id;
     const iframe = document.createElement("iframe");
-    iframe.src = "https://www.youtube.com/embed/" + video.youtubeId + "?controls=1&fs=1&rel=0&playsinline=1&modestbranding=1&iv_load_policy=3";
+    iframe.src = "https://www.youtube.com/embed/" + yId + "?controls=1&fs=1&rel=0&playsinline=1&modestbranding=1&iv_load_policy=3";
     iframe.title = video.name || "YouTube video player";
     iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share";
     iframe.allowFullscreen = true;
     iframe.loading = "lazy";
     iframe.referrerPolicy = "strict-origin-when-cross-origin";
     thumb.appendChild(iframe);
+  } else if (video.mediaData) {
+    const md = video.mediaData;
+    if (md.platform === "instagram") {
+      const iframe = document.createElement("iframe");
+      iframe.src = `https://www.instagram.com/p/${md.id}/embed/`;
+      iframe.allowFullscreen = true;
+      iframe.loading = "lazy";
+      iframe.style.background = "white";
+      thumb.appendChild(iframe);
+    } else if (md.platform === "reddit") {
+      const iframe = document.createElement("iframe");
+      iframe.src = `https://www.redditmedia.com${md.pathname}?ref_source=embed&ref=share&embed=true`;
+      iframe.allowFullscreen = true;
+      iframe.loading = "lazy";
+      thumb.appendChild(iframe);
+    } else if (md.platform === "linkedin") {
+      const iframe = document.createElement("iframe");
+      const urnId = md.url.match(/\d{19}/);
+      iframe.src = urnId ? `https://www.linkedin.com/embed/feed/update/urn:li:activity:${urnId[0]}` : md.url;
+      iframe.allowFullscreen = true;
+      iframe.loading = "lazy";
+      thumb.appendChild(iframe);
+    } else if (md.platform === "threads") {
+      const iframe = document.createElement("iframe");
+      const cleanUrl = md.url.split('?')[0].replace(/\/$/, '');
+      iframe.src = `${cleanUrl}/embed/`;
+      iframe.allowFullscreen = true;
+      iframe.loading = "lazy";
+      thumb.appendChild(iframe);
+    } else if (md.platform === "direct") {
+      const vid = document.createElement("video");
+      vid.src = md.url;
+      vid.controls = true;
+      vid.style.width = "100%";
+      vid.style.height = "100%";
+      thumb.appendChild(vid);
+    } else if (md.platform === "torrent") {
+      const msg = document.createElement("div");
+      msg.style.padding = "20px";
+      msg.style.wordBreak = "break-all";
+      msg.innerHTML = `<strong>Torrent Link</strong><br><br><a target="_blank" style="color:#00a8ff;">Open Magnet Link</a><br><br><em>(Browser streaming requires external clients)</em>`;
+      msg.querySelector('a').href = md.url; // Assign safely without XSS risk
+      thumb.appendChild(msg);
+    } else {
+      const iframe = document.createElement("iframe");
+      iframe.src = md.url;
+      iframe.allowFullscreen = true;
+      iframe.loading = "lazy";
+      thumb.appendChild(iframe);
+    }
+  } else {
+    thumb.innerHTML = `<div style="padding:20px;">Unsupported media format</div>`;
   }
 
   const meta = document.createElement("div");
@@ -591,10 +698,10 @@ function saveLink() {
 
   const title = videoTitleInputEl.value.trim();
   const url = videoUrlInputEl.value.trim();
-  const youtubeId = extractYouTubeVideoId(url);
+  const mediaData = parseMediaLink(url);
 
-  if (!youtubeId) {
-    alert("Please paste a valid YouTube link.");
+  if (!mediaData) {
+    alert("Please paste a valid media link.");
     return;
   }
 
@@ -602,7 +709,7 @@ function saveLink() {
     id: id(),
     index: 0,
     name: title || "Video name",
-    youtubeId,
+    mediaData,
     createdAt: Date.now()
   };
 

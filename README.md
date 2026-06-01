@@ -1,11 +1,11 @@
-# YouTube Playlist Builder
+# Multi-Platform Media Playlist Builder
 
-YouTube Playlist Builder is a lightweight, client-side web application that allows users to create, organize, and manage custom YouTube video playlists without needing to log into a YouTube account.
+Media Playlist Builder is a lightweight, client-side web application that allows users to create, organize, and manage custom video playlists across multiple platforms (YouTube, Instagram, Reddit, LinkedIn, Threads, direct files, and torrents) without needing any accounts.
 
 ## Features
 
 - **Create Custom Sections:** Group your videos into distinct playlists or categories.
-- **Add Videos Easily:** Simply paste a YouTube URL to embed a video.
+- **Multi-Platform Support:** Paste a link from YouTube, Instagram, Reddit, LinkedIn, Threads, online streaming domains, or magnet links to automatically generate the correct embed and thumbnail.
 - **Reordering:** Change the priority/order of sections or individual videos seamlessly.
 - **Uninterrupted Playback:** UI updates (adding, deleting, moving) happen dynamically without reloading playing videos.
 - **Data Export & Import:** Save your playlists as a JSON file to back them up or move them to another device.
