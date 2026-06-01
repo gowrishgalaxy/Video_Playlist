@@ -26,6 +26,8 @@ const state = {
 let backupFileHandle = null;
 let isWritingBackup = false;
 let backupPending = false;
+let fallbackBackupActive = false;
+let fallbackBackupTimer = null;
 
 function saveState() {
   const data = {
@@ -40,6 +42,14 @@ function saveState() {
 }
 
 async function writeBackup() {
+  if (fallbackBackupActive) {
+    if (fallbackBackupTimer) clearTimeout(fallbackBackupTimer);
+    fallbackBackupTimer = setTimeout(() => {
+      exportData();
+    }, 5000); // 5 seconds debounce for fallback downloads
+    return;
+  }
+
   if (!backupFileHandle) return;
   if (isWritingBackup) {
     backupPending = true;
@@ -803,28 +813,51 @@ linkDialogEl.addEventListener("click", (e) => {
   if (e.target === linkDialogEl) closeDialog();
 });
 themeToggleEl.addEventListener("click", toggleTheme);
-window.addEventListener("beforeunload", saveState);
+window.addEventListener("beforeunload", () => {
+  if (fallbackBackupActive && fallbackBackupTimer) {
+    clearTimeout(fallbackBackupTimer);
+    exportData();
+  }
+  saveState();
+});
 
-if ('showSaveFilePicker' in window) {
-  const backupBtnEl = document.createElement("button");
-  backupBtnEl.className = "btn";
-  backupBtnEl.textContent = "Auto-Backup";
-  backupBtnEl.title = "Select a local file to automatically save changes";
-  backupBtnEl.addEventListener("click", async () => {
+const backupBtnEl = document.createElement("button");
+backupBtnEl.className = "btn";
+backupBtnEl.textContent = "Auto-Backup";
+backupBtnEl.title = "Select a local file to automatically save changes";
+backupBtnEl.addEventListener("click", async () => {
+  if ('showSaveFilePicker' in window) {
     try {
       backupFileHandle = await window.showSaveFilePicker({
         suggestedName: 'playlist-backup.json',
         types: [{ description: 'JSON Files', accept: {'application/json': ['.json']} }],
       });
       alert("Auto-backup is now active! All your actions will automatically sync to the selected file.");
+      fallbackBackupActive = false;
       writeBackup();
     } catch (err) {
       console.error("Backup setup cancelled or failed", err);
+      if (err.name !== 'AbortError') {
+        const confirmFallback = confirm("Your browser blocked live file syncing. Enable fallback mode? This will automatically download a new backup file periodically after changes.");
+        if (confirmFallback) {
+          fallbackBackupActive = true;
+          alert("Fallback auto-backup active!");
+          writeBackup();
+        }
+      }
     }
-  });
-  if (exportDataBtnEl && exportDataBtnEl.parentNode) {
-    exportDataBtnEl.parentNode.insertBefore(backupBtnEl, exportDataBtnEl.nextSibling);
+  } else {
+    const confirmFallback = confirm("Your browser does not support live file syncing. Enable fallback mode? This will automatically download a new backup file periodically after changes.");
+    if (confirmFallback) {
+      fallbackBackupActive = true;
+      alert("Fallback auto-backup active!");
+      writeBackup();
+    }
   }
+});
+
+if (exportDataBtnEl && exportDataBtnEl.parentNode) {
+  exportDataBtnEl.parentNode.insertBefore(backupBtnEl, exportDataBtnEl.nextSibling);
 }
 
 loadState();
