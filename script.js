@@ -40,15 +40,6 @@ function loadState() {
   try {
     const data = JSON.parse(raw);
     if (data && typeof data === "object") {
-      if (data.lastSaved && (Date.now() - data.lastSaved > 10 * 60 * 1000)) {
-        const navEntries = performance.getEntriesByType && performance.getEntriesByType("navigation");
-        const isReload = navEntries && navEntries.length > 0 && navEntries[0].type === "reload";
-        
-        if (!isReload) {
-          localStorage.removeItem(STORAGE_KEY);
-          return;
-        }
-      }
       state.theme = data.theme === "light" ? "light" : "dark";
       state.sections = Array.isArray(data.sections) ? data.sections : [];
       state.deletedSections = Array.isArray(data.deletedSections) ? data.deletedSections : [];
@@ -215,6 +206,7 @@ function createVideoElement(section, video) {
   const slot = document.createElement("div");
   slot.className = "video-slot";
   slot.dataset.videoId = video.id;
+  slot.style.order = video.index;
 
   const thumb = document.createElement("div");
   thumb.className = "thumb-wrap";
@@ -251,7 +243,7 @@ function createVideoElement(section, video) {
     if (grid) {
       section.videos.forEach(v => {
         const s = grid.querySelector(`.video-slot[data-video-id="${v.id}"]`);
-        if (s) grid.appendChild(s);
+        if (s) s.style.order = v.index;
       });
       updateSectionVideoDropdowns(section);
     } else {
@@ -550,6 +542,10 @@ function deleteVideo(sectionId, videoId) {
   if (grid) {
     const slot = grid.querySelector(`.video-slot[data-video-id="${videoId}"]`);
     if (slot) slot.remove();
+    section.videos.forEach(v => {
+      const s = grid.querySelector(`.video-slot[data-video-id="${v.id}"]`);
+      if (s) s.style.order = v.index;
+    });
     updateSectionVideoDropdowns(section);
   } else {
     renderSections();
@@ -578,6 +574,10 @@ function restoreVideo(deletedVideoId) {
   if (grid) {
     const slot = createVideoElement(section, deletedVideo.video);
     grid.appendChild(slot);
+    section.videos.forEach(v => {
+      const s = grid.querySelector(`.video-slot[data-video-id="${v.id}"]`);
+      if (s) s.style.order = v.index;
+    });
     updateSectionVideoDropdowns(section);
   } else {
     renderSections();

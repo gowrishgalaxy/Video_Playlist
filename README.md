@@ -12,7 +12,6 @@ YouTube Playlist Builder is a lightweight, client-side web application that allo
 - **Recycle Bin:** Accidentally deleted a video or section? Restore it instantly from the Recycle Bin.
 - **Dark/Light Theme:** Toggle between themes for comfortable viewing.
 - **Local Storage:** Your playlist data is automatically saved to your browser's local storage, ensuring your work is there when you return.
-- **Session Auto-Reset:** If the application is closed for more than 10 minutes without a refresh, the session is automatically cleared to provide a fresh start.
 
 ## How it Works (Brainstorming Flow)
 
