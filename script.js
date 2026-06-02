@@ -20,7 +20,8 @@ const state = {
   sections: [],
   deletedSections: [],
   deletedVideos: [],
-  dialogTargetSectionId: null
+  dialogTargetSectionId: null,
+  dialogTargetVideoId: null
 };
 
 let backupFileHandle = null;
@@ -193,7 +194,13 @@ function id() {
 
 function parseMediaLink(url) {
   if (!url) return null;
-  const text = url.trim();
+  let text = url.trim();
+
+  // Extract URL if there's text surrounding it (common with Meta application share links)
+  const httpMatch = text.match(/(https?:\/\/[^\s]+)/);
+  if (httpMatch) {
+    text = httpMatch[1];
+  }
 
   if (/\.(mp4|webm|ogg|m3u8)(\?.*)?$/i.test(text)) {
     return { platform: "direct", url: text };
@@ -237,7 +244,8 @@ function parseMediaLink(url) {
       return { platform: "linkedin", url: text };
     }
     if (host === "threads.net") {
-      return { platform: "threads", url: text };
+      const authorMatch = parsed.pathname.match(/@([^/]+)/);
+      return { platform: "threads", url: text, author: authorMatch ? authorMatch[1] : null };
     }
     if (host === "imdb.com" || host === "m.imdb.com") {
       const match = parsed.pathname.match(/\/title\/(tt\d+)/);
@@ -296,6 +304,7 @@ function moveVideoToPriority(section, videoId, targetPriority) {
 
 function openDialog(sectionId) {
   state.dialogTargetSectionId = sectionId;
+  state.dialogTargetVideoId = null;
   videoTitleInputEl.value = "";
   videoUrlInputEl.value = "";
   linkDialogEl.classList.add("show");
@@ -304,14 +313,164 @@ function openDialog(sectionId) {
 
 function closeDialog() {
   state.dialogTargetSectionId = null;
+  state.dialogTargetVideoId = null;
   linkDialogEl.classList.remove("show");
 }
+
+function openEditDialog(section, video) {
+  state.dialogTargetSectionId = section.id;
+  state.dialogTargetVideoId = video.id;
+  videoTitleInputEl.value = video.name || "";
+  
+  let hint = "";
+  if (video.mediaData) {
+    if (video.mediaData.url) hint = video.mediaData.url;
+    else if (video.mediaData.platform === "youtube") hint = `https://www.youtube.com/watch?v=${video.mediaData.id}`;
+    else if (video.mediaData.platform === "instagram") hint = `https://www.instagram.com/p/${video.mediaData.id}`;
+    else if (video.mediaData.platform === "reddit") hint = `https://www.reddit.com${video.mediaData.pathname}`;
+    else if (video.mediaData.platform === "imdb") hint = `https://www.imdb.com/title/${video.mediaData.id}`;
+  } else if (video.youtubeId) {
+    hint = `https://www.youtube.com/watch?v=${video.youtubeId}`;
+  }
+  videoUrlInputEl.value = hint;
+  linkDialogEl.classList.add("show");
+  videoTitleInputEl.focus();
+}
+
+const getNoteIcon = (hasNotes) => `
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="${hasNotes ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;">
+    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+  </svg>
+`;
+
+const noteDialogEl = document.createElement("div");
+noteDialogEl.style.position = "fixed";
+noteDialogEl.style.top = "0";
+noteDialogEl.style.left = "0";
+noteDialogEl.style.width = "100%";
+noteDialogEl.style.height = "100%";
+noteDialogEl.style.backgroundColor = "rgba(0, 0, 0, 0.7)";
+noteDialogEl.style.display = "none";
+noteDialogEl.style.justifyContent = "center";
+noteDialogEl.style.alignItems = "center";
+noteDialogEl.style.zIndex = "1000";
+
+const noteDialogContent = document.createElement("div");
+noteDialogContent.style.background = "var(--bg-card, var(--bg-color, #222))";
+noteDialogContent.style.color = "var(--text-color, #eee)";
+noteDialogContent.style.padding = "20px";
+noteDialogContent.style.borderRadius = "8px";
+  noteDialogContent.style.width = "600px";
+noteDialogContent.style.maxWidth = "90%";
+noteDialogContent.style.display = "flex";
+noteDialogContent.style.flexDirection = "column";
+noteDialogContent.style.gap = "15px";
+
+const noteDialogTitle = document.createElement("h3");
+noteDialogTitle.textContent = "Video Notes";
+noteDialogTitle.style.margin = "0";
+
+const noteDialogTextarea = document.createElement("textarea");
+noteDialogTextarea.style.width = "100%";
+noteDialogTextarea.style.minHeight = "400px";
+noteDialogTextarea.style.resize = "vertical";
+noteDialogTextarea.style.padding = "10px";
+noteDialogTextarea.style.boxSizing = "border-box";
+noteDialogTextarea.style.background = "var(--input-bg, #333)";
+noteDialogTextarea.style.color = "var(--text-color, #eee)";
+noteDialogTextarea.style.border = "1px solid var(--border-color, #555)";
+noteDialogTextarea.style.borderRadius = "4px";
+noteDialogTextarea.placeholder = "Create, read, or update your notes here...";
+
+const noteDialogActions = document.createElement("div");
+noteDialogActions.style.display = "flex";
+noteDialogActions.style.justifyContent = "flex-end";
+noteDialogActions.style.gap = "10px";
+
+const saveNoteBtn = document.createElement("button");
+saveNoteBtn.className = "btn";
+saveNoteBtn.textContent = "Save";
+
+const cancelNoteBtn = document.createElement("button");
+cancelNoteBtn.className = "btn ghost";
+cancelNoteBtn.textContent = "Cancel";
+
+const updateNoteBtn = document.createElement("button");
+updateNoteBtn.className = "btn";
+updateNoteBtn.textContent = "Update";
+
+noteDialogActions.appendChild(cancelNoteBtn);
+noteDialogActions.appendChild(updateNoteBtn);
+noteDialogActions.appendChild(saveNoteBtn);
+noteDialogContent.appendChild(noteDialogTitle);
+noteDialogContent.appendChild(noteDialogTextarea);
+noteDialogContent.appendChild(noteDialogActions);
+noteDialogEl.appendChild(noteDialogContent);
+document.body.appendChild(noteDialogEl);
+
+function openNoteDialog(section, video) {
+  state.dialogTargetSectionId = section.id;
+  state.dialogTargetVideoId = video.id;
+  noteDialogTextarea.value = video.notes || "";
+  noteDialogEl.style.display = "flex";
+  noteDialogTextarea.focus();
+}
+
+function closeNoteDialog() {
+  state.dialogTargetSectionId = null;
+  state.dialogTargetVideoId = null;
+  noteDialogEl.style.display = "none";
+}
+
+function saveCurrentNote() {
+  const section = state.sections.find(s => s.id === state.dialogTargetSectionId);
+  if (section) {
+    const video = section.videos.find(v => v.id === state.dialogTargetVideoId);
+    if (video) {
+      video.notes = noteDialogTextarea.value.trim();
+      saveState();
+      
+      const grid = document.querySelector(`.section-card[data-section-id="${section.id}"] .video-grid`);
+      if (grid) {
+         const slot = grid.querySelector(`.video-slot[data-video-id="${video.id}"]`);
+         if (slot) {
+           const icon = slot.querySelector(".video-note");
+           if (icon) icon.innerHTML = getNoteIcon(!!video.notes);
+         }
+      }
+    }
+  }
+}
+
+updateNoteBtn.addEventListener("click", () => {
+  saveCurrentNote();
+  const originalText = updateNoteBtn.textContent;
+  updateNoteBtn.textContent = "Updated!";
+  setTimeout(() => updateNoteBtn.textContent = originalText, 1500);
+});
+
+saveNoteBtn.addEventListener("click", () => {
+  saveCurrentNote();
+  closeNoteDialog();
+});
+
+cancelNoteBtn.addEventListener("click", closeNoteDialog);
+
+noteDialogEl.addEventListener("click", (e) => {
+  if (e.target === noteDialogEl) closeNoteDialog();
+});
 
 function createVideoElement(section, video) {
   const slot = document.createElement("div");
   slot.className = "video-slot";
   slot.dataset.videoId = video.id;
   slot.style.order = video.index;
+
+  const getCurrentSection = () => {
+    const card = slot.closest('.section-card');
+    return card ? state.sections.find(s => s.id === card.dataset.sectionId) : section;
+  };
 
   const thumb = document.createElement("div");
   thumb.className = "thumb-wrap";
@@ -323,7 +482,6 @@ function createVideoElement(section, video) {
     iframe.title = video.name || "YouTube video player";
     iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share";
     iframe.allowFullscreen = true;
-    iframe.loading = "lazy";
     iframe.referrerPolicy = "strict-origin-when-cross-origin";
     thumb.appendChild(iframe);
   } else if (video.mediaData) {
@@ -332,28 +490,25 @@ function createVideoElement(section, video) {
       const iframe = document.createElement("iframe");
       iframe.src = `https://www.instagram.com/p/${md.id}/embed/`;
       iframe.allowFullscreen = true;
-      iframe.loading = "lazy";
       iframe.style.background = "white";
       thumb.appendChild(iframe);
     } else if (md.platform === "reddit") {
       const iframe = document.createElement("iframe");
       iframe.src = `https://www.redditmedia.com${md.pathname}?ref_source=embed&ref=share&embed=true`;
       iframe.allowFullscreen = true;
-      iframe.loading = "lazy";
       thumb.appendChild(iframe);
     } else if (md.platform === "linkedin") {
       const iframe = document.createElement("iframe");
       const urnId = md.url.match(/\d{19}/);
       iframe.src = urnId ? `https://www.linkedin.com/embed/feed/update/urn:li:activity:${urnId[0]}` : md.url;
       iframe.allowFullscreen = true;
-      iframe.loading = "lazy";
       thumb.appendChild(iframe);
     } else if (md.platform === "threads") {
       const iframe = document.createElement("iframe");
       const cleanUrl = md.url.split('?')[0].replace(/\/$/, '');
       iframe.src = `${cleanUrl}/embed/`;
       iframe.allowFullscreen = true;
-      iframe.loading = "lazy";
+      iframe.style.background = "white";
       thumb.appendChild(iframe);
     } else if (md.platform === "direct") {
       const vid = document.createElement("video");
@@ -366,7 +521,6 @@ function createVideoElement(section, video) {
       const iframe = document.createElement("iframe");
       iframe.src = `https://vidsrc.me/embed/${md.id}`;
       iframe.allowFullscreen = true;
-      iframe.loading = "lazy";
       thumb.appendChild(iframe);
     } else if (md.platform === "torrent") {
       const msg = document.createElement("div");
@@ -379,7 +533,6 @@ function createVideoElement(section, video) {
       const iframe = document.createElement("iframe");
       iframe.src = md.url;
       iframe.allowFullscreen = true;
-      iframe.loading = "lazy";
       thumb.appendChild(iframe);
     }
   } else {
@@ -388,6 +541,49 @@ function createVideoElement(section, video) {
 
   const meta = document.createElement("div");
   meta.className = "video-meta";
+  meta.style.display = "flex";
+  meta.style.alignItems = "center";
+  meta.style.flexWrap = "nowrap";
+  meta.style.gap = "8px";
+
+  const secSelect = document.createElement("select");
+  secSelect.className = "video-section-select";
+  state.sections.forEach(s => {
+    const opt = document.createElement("option");
+    opt.value = s.id;
+    opt.textContent = s.title || "Playlist Name";
+    if (s.id === section.id) opt.selected = true;
+    secSelect.appendChild(opt);
+  });
+
+  secSelect.addEventListener("change", (e) => {
+    const targetSectionId = e.target.value;
+    const currentSection = getCurrentSection();
+    if (currentSection.id === targetSectionId) return;
+
+    const targetSection = state.sections.find(s => s.id === targetSectionId);
+    if (!targetSection) return;
+
+    const vIdx = currentSection.videos.findIndex(v => v.id === video.id);
+    if (vIdx === -1) return;
+
+    const [movedVideo] = currentSection.videos.splice(vIdx, 1);
+    targetSection.videos.push(movedVideo);
+
+    normalizeVideoOrder(currentSection);
+    normalizeVideoOrder(targetSection);
+    saveState();
+
+    const targetGrid = document.querySelector(`.section-card[data-section-id="${targetSectionId}"] .video-grid`);
+    if (targetGrid) {
+      targetGrid.appendChild(slot);
+      
+      updateSectionVideoDropdowns(currentSection);
+      updateSectionVideoDropdowns(targetSection);
+    } else {
+      renderSections();
+    }
+  });
 
   const idx = document.createElement("select");
   idx.className = "video-index";
@@ -400,16 +596,17 @@ function createVideoElement(section, video) {
     idx.appendChild(opt);
   }
   idx.addEventListener("change", (e) => {
-    moveVideoToPriority(section, video.id, Number(e.target.value));
+    const currentSection = getCurrentSection();
+    moveVideoToPriority(currentSection, video.id, Number(e.target.value));
     saveState();
     
-    const grid = document.querySelector(`.section-card[data-section-id="${section.id}"] .video-grid`);
+    const grid = document.querySelector(`.section-card[data-section-id="${currentSection.id}"] .video-grid`);
     if (grid) {
-      section.videos.forEach(v => {
+      currentSection.videos.forEach(v => {
         const s = grid.querySelector(`.video-slot[data-video-id="${v.id}"]`);
         if (s) s.style.order = v.index;
       });
-      updateSectionVideoDropdowns(section);
+      updateSectionVideoDropdowns(currentSection);
     } else {
       renderSections();
     }
@@ -418,6 +615,8 @@ function createVideoElement(section, video) {
   const name = document.createElement("input");
   name.className = "video-name";
   name.type = "text";
+  name.style.flex = "1";
+  name.style.minWidth = "50px";
   name.value = video.name;
   name.placeholder = "Video name";
   name.addEventListener("input", (e) => {
@@ -430,14 +629,30 @@ function createVideoElement(section, video) {
     saveState();
   });
 
+  const notesBtn = document.createElement("button");
+  notesBtn.className = "btn ghost video-note";
+  notesBtn.type = "button";
+  notesBtn.title = "Notes";
+  notesBtn.innerHTML = getNoteIcon(!!video.notes);
+  notesBtn.addEventListener("click", () => openNoteDialog(getCurrentSection(), video));
+
   const deleteVideoBtn = document.createElement("button");
   deleteVideoBtn.className = "btn ghost video-delete";
   deleteVideoBtn.type = "button";
   deleteVideoBtn.textContent = "Delete";
-  deleteVideoBtn.addEventListener("click", () => deleteVideo(section.id, video.id));
+  deleteVideoBtn.addEventListener("click", () => deleteVideo(getCurrentSection().id, video.id));
+
+  const editVideoBtn = document.createElement("button");
+  editVideoBtn.className = "btn ghost video-edit";
+  editVideoBtn.type = "button";
+  editVideoBtn.textContent = "Edit";
+  editVideoBtn.addEventListener("click", () => openEditDialog(getCurrentSection(), video));
 
   meta.appendChild(idx);
   meta.appendChild(name);
+  meta.appendChild(secSelect);
+  meta.appendChild(notesBtn);
+  meta.appendChild(editVideoBtn);
   meta.appendChild(deleteVideoBtn);
   slot.appendChild(thumb);
   slot.appendChild(meta);
@@ -464,6 +679,24 @@ function updateSectionVideoDropdowns(section) {
       if (i === video.index) opt.selected = true;
       select.appendChild(opt);
     }
+  });
+}
+
+function updateAllVideoSectionDropdowns() {
+  const selects = document.querySelectorAll(".video-section-select");
+  selects.forEach(select => {
+    const slot = select.closest(".video-slot");
+    const card = slot ? slot.closest(".section-card") : null;
+    const currentSectionId = card ? card.dataset.sectionId : select.value;
+    
+    select.innerHTML = "";
+    state.sections.forEach(s => {
+      const opt = document.createElement("option");
+      opt.value = s.id;
+      opt.textContent = s.title || "Playlist Name";
+      if (s.id === currentSectionId) opt.selected = true;
+      select.appendChild(opt);
+    });
   });
 }
 
@@ -502,11 +735,13 @@ function createSectionElement(section) {
   nameInput.addEventListener("input", (e) => {
     section.title = e.target.value;
     saveState();
+    updateAllVideoSectionDropdowns();
   });
   nameInput.addEventListener("blur", (e) => {
     section.title = e.target.value.trim() || "Playlist Name";
     nameInput.value = section.title;
     saveState();
+    updateAllVideoSectionDropdowns();
   });
 
   const select = document.createElement("select");
@@ -538,6 +773,7 @@ function createSectionElement(section) {
         }
       }
       updateAllSectionDropdowns();
+      updateAllVideoSectionDropdowns();
     } else {
       renderSections();
     }
@@ -651,6 +887,7 @@ function addSection() {
   const card = createSectionElement(newSection);
   sectionListEl.appendChild(card);
   updateAllSectionDropdowns();
+  updateAllVideoSectionDropdowns();
 }
 
 function deleteSection(sectionId) {
@@ -665,6 +902,7 @@ function deleteSection(sectionId) {
   if (card) {
     card.remove();
     updateAllSectionDropdowns();
+    updateAllVideoSectionDropdowns();
   } else {
     renderSections();
   }
@@ -682,6 +920,7 @@ function restoreSection(sectionId) {
   const card = createSectionElement(section);
   sectionListEl.appendChild(card);
   updateAllSectionDropdowns();
+  updateAllVideoSectionDropdowns();
   
   renderDeleted();
 }
@@ -762,25 +1001,51 @@ function saveLink() {
     return;
   }
 
-  const newVideo = {
-    id: id(),
-    index: 0,
-    name: title || "Video name",
-    mediaData,
-    createdAt: Date.now()
-  };
+  const defaultName = mediaData.author ? `Post by @${mediaData.author}` : "Video name";
 
-  section.videos.push(newVideo);
-  normalizeVideoOrder(section);
-  saveState();
-  
-  const grid = document.querySelector(`.section-card[data-section-id="${section.id}"] .video-grid`);
-  if (grid) {
-    const slot = createVideoElement(section, newVideo);
-    grid.appendChild(slot);
-    updateSectionVideoDropdowns(section);
+  if (state.dialogTargetVideoId) {
+    const video = section.videos.find((v) => v.id === state.dialogTargetVideoId);
+    if (video) {
+      video.name = title || defaultName;
+      video.mediaData = mediaData;
+      if (video.youtubeId) delete video.youtubeId; // clear old fallback
+      saveState();
+      
+      const grid = document.querySelector(`.section-card[data-section-id="${section.id}"] .video-grid`);
+      if (grid) {
+        const oldSlot = grid.querySelector(`.video-slot[data-video-id="${video.id}"]`);
+        if (oldSlot) {
+          const newSlot = createVideoElement(section, video);
+          oldSlot.replaceWith(newSlot);
+          updateSectionVideoDropdowns(section);
+        } else {
+          renderSections();
+        }
+      } else {
+        renderSections();
+      }
+    }
   } else {
-    renderSections();
+    const newVideo = {
+      id: id(),
+      index: 0,
+      name: title || defaultName,
+      mediaData,
+      createdAt: Date.now()
+    };
+
+    section.videos.push(newVideo);
+    normalizeVideoOrder(section);
+    saveState();
+    
+    const grid = document.querySelector(`.section-card[data-section-id="${section.id}"] .video-grid`);
+    if (grid) {
+      const slot = createVideoElement(section, newVideo);
+      grid.appendChild(slot);
+      updateSectionVideoDropdowns(section);
+    } else {
+      renderSections();
+    }
   }
   closeDialog();
 }
